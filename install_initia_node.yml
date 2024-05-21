@@ -6,9 +6,6 @@
     - name: moniker
       prompt: "Enter the node name"
       private: no
-    - name: snapshot_block
-      prompt: "Enter the block height of the polkachu snapshot"
-      private: no
   vars:
     p2p_port: 26656
     rpc_port: 26657
@@ -98,8 +95,7 @@
       shell: initiad init {{ moniker }} --chain-id initiation-1
 
     - name: Download Genesis File
-      shell: |
-        wget https://initia.s3.ap-southeast-1.amazonaws.com/initiation-1/genesis.json -O ~/.initia/config/genesis.json
+      shell: wget https://initia.s3.ap-southeast-1.amazonaws.com/initiation-1/genesis.json -O ~/.initia/config/genesis.json
 
     - name: Configure seeds in config.toml
       lineinfile:
@@ -144,12 +140,21 @@
       file:
         path: "{{ ansible_env.HOME }}/.initia/data"
         state: directory
+    - name: Retrieve the latest Babylon snapshot URL
+      ansible.builtin.uri:
+        url: "https://www.polkachu.com/testnets/initia/snapshots"
+        return_content: yes
+      register: webpage_content
+
+    - name: Parse the snapshot URL
+      ansible.builtin.set_fact:
+        snapshot_url: "{{ webpage_content.content | regex_search('https://snapshots.polkachu.com/testnet-snapshots/initia/initia_[0-9]+\\.tar\\.lz4') }}"
 
     - name: Download the snapshot with curl and show progress
-      command:
-        cmd: "curl -L https://snapshots.polkachu.com/testnet-snapshots/initia/initia_{{ snapshot_block }}.tar.lz4 -o {{ ansible_env.HOME }}/.initia/initia_snapshot.tar.lz4 --progress-bar"
+      ansible.builtin.command:
+       cmd: "curl -L {{ snapshot_url }} -o {{ ansible_env.HOME }}/.initia/initia_snapshot.tar.lz4 --progress-bar"
       args:
-        executable: /bin/bash
+       executable: /bin/bash
       register: curl_result
       failed_when: curl_result.rc != 0
 
